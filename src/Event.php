@@ -58,18 +58,19 @@ class Event
      *
      * @return mixed
      */
-    public static function create(array $properties, string $calendarId = null, $optParams = [])
+    public static function create(array $eventDetails, $optParams = [])
     {
         $event = new static;
 
-        $event->calendarId = static::getGoogleCalendar($calendarId)->getCalendarId();
+        $event->calendarId = $eventDetails['calendarId'];
 
-        foreach ($properties as $name => $value) {
+        foreach ($eventDetails as $name => $value) {
             $event->$name = $value;
         }
 
         return $event->save('insertEvent', $optParams);
     }
+   
 
     public static function quickCreate(string $text)
     {
@@ -269,29 +270,50 @@ class Event
         return GoogleCalendarFactory::createForCalendarId($calendarId);
     }
 
-    protected function setDateProperty(string $name, CarbonInterface $date)
+    
+    protected function setDateProperty(string $name, $date)
     {
         $eventDateTime = new Google_Service_Calendar_EventDateTime;
-
+    
         if (in_array($name, ['start.date', 'end.date'])) {
+            $date = $this->normalizeDate($date);
             $eventDateTime->setDate($date->format('Y-m-d'));
             $eventDateTime->setTimezone((string) $date->getTimezone());
         }
-
+    
         if (in_array($name, ['start.dateTime', 'end.dateTime'])) {
+            $date = $this->normalizeDateTime($date);
             $eventDateTime->setDateTime($date->format(DateTime::RFC3339));
             $eventDateTime->setTimezone((string) $date->getTimezone());
         }
-
+    
         if (Str::startsWith($name, 'start')) {
             $this->googleEvent->setStart($eventDateTime);
         }
-
+    
         if (Str::startsWith($name, 'end')) {
             $this->googleEvent->setEnd($eventDateTime);
         }
     }
-
+    
+    protected function normalizeDate($date): CarbonInterface
+    {
+        if (!$date instanceof CarbonInterface) {
+            $date = Carbon::parse($date);
+        }
+    
+        return $date;
+    }
+    
+    protected function normalizeDateTime($dateTime): CarbonInterface
+    {
+        if (!$dateTime instanceof CarbonInterface) {
+            $dateTime = Carbon::parse($dateTime);
+        }
+    
+        return $dateTime;
+    }
+    
     protected function setSourceProperty(array $value)
     {
         $source = new Google_Service_Calendar_EventSource([
